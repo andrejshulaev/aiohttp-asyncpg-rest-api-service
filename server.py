@@ -1,111 +1,102 @@
 import inspect
 import json
+import asyncio
+import uvloop
+import datetime
 
-from aiohttp.http_exceptions import  HttpBadRequest
-from aiohttp.web_exceptions import HTTPMethodNotAllowed
-from aiohttp.web import Request, Response, Application, run_app
-from aiohttp.web_urldispatcher import UrlDispatcher
+from aiohttp import web
+from aiohttp.web import Response, Application, run_app
 
-import models as models
+import models.models as models
 
-DEFAULT_METHODS = ('GET', 'POST', 'PUT', 'DELETE')
-
-
-class RestEndpoint:
-    def __init__(self):
-        self.methods = {}
-
-        for method_name in DEFAULT_METHODS:
-            method = getattr(self, method_name.lower(), None)
-            if method:
-                self.register_method(method_name, method)
-
-    def register_method(self, method_name, method):
-        self.methods[method_name.upper()] = method
-
-    async def dispatch(self, request: Request):
-        method = self.methods.get(request.method.upper())
-        print(method)
-        if not method:
-            raise HTTPMethodNotAllowed('', DEFAULT_METHODS)
-        wanted_args = list(inspect.signature(method).parameters.keys())
-        available_args = request.match_info.copy()
-        available_args.update({'request': request})
-        unsatisfied_args = set(wanted_args) - set(available_args.keys())
-        if unsatisfied_args:
-            raise HttpBadRequest('')
-        return await method(**{arg_name: available_args[arg_name] for arg_name in wanted_args})
+from models.db import init_db, close_db
+from utils import load_forecasts_to_db
 
 
-class CollectionEndpoint(RestEndpoint):
-    def __init__(self):
-        super().__init__()
+class Handler:
 
-    async def get(self) -> Response:
+    async def get_all_records(self, request) -> Response:
+        pool = request.app['pool']
+        offset = request.rel_url.query.get('offset', 0)
+        limit = request.rel_url.query.get('limit', 10)
+        async with pool.acquire() as connection:
+            result = await models.get_all_records(connection, limit, offset)
         return Response(status=200, body=json.dumps({
-            'notes': [
-                note.to_json() for note in models.get_all_records()
-            ]
-        }), content_type='application/json')
-
-    async def post(self, request):
-        data = await request.json()
-        models.add_new_record(data)
-        return Response(status=201, body=json.dumps({
-            'notes': [note.to_json for note in models.get_all_records()]
+            'records': [result]
         }), content_type='application/json')
 
 
-class InstanceEndpoint(RestEndpoint):
-    def __init__(self):
-        super().__init__()
-
-    async def get(self, instance_date):
-        instance = models.find_forecast_by_date(instance_date)
-        if not instance:
-            return Response(status=404, body=json.dumps({'not found': 404}),
-                            content_type='application/json')
-        return Response(status=200, body=json.dumps(instance.to_json()),
-                        content_type='application/json')
-
-    async def put(self, request, instance_date):
+    async def post_record(self, request) -> Response:
+        pool = request.app['pool']
         data = await request.json()
-        instance = models.update_forecast(instance_date, data)
-        return Response(status=201, body=json.dumps(instance.to_json()),
-                        content_type='application/json')
 
-    async def delete(self, instance_date):
-        instance = models.find_forecast_by_date(instance_date)
+        async with pool.acquire() as connection:
+            res = await models.insert_record(connection, data)
+        if not res[0]:
+            return Response(status=400, body=json.dumps({{res[1]: 400}}), content_type='application/json')
+        return Response(status=200, body=json.dumps({{'success': 204}}), content_type='application/json')
+
+
+    async def get_record(self, request) -> Response:
+        pool = request.app['pool']
+        today = datetime.datetime.today().strftime('%Y/%m/%d')
+        instance_date = request.match_info.get('date', today)
+        async with pool.acquire() as connection:
+            instance = await models.insert_record(connection, instance_date)
         if not instance:
             return Response(status=404, body=json.dumps({'not found': 404}),
                             content_type='application/json')
-        models.delete_forecast_by_date(instance_date)
-        return Response(status=204)
+        return Response(status=200, body=json.dumps(instance),
+                        content_type='application/json')
 
 
-class RestResource:
-    def __init__(self):
-        self.collection_endpoint = CollectionEndpoint()
-        self.instance_endpoint = InstanceEndpoint()
+    async def put_record(self, request) -> Response:
+        pool = request.app['pool']
+        data = await request.json()
+        instance_date = request.match_info.get('date', None)
+        if not instance_date:
+            return Response(status=400, body=json.dumps({'bad request': 400}),
+                            content_type='application/json')
+        async with pool.acquire() as connection:
+            instance = await models.get_record_by_date(connection, instance_date)
+        if not instance:
+            return Response(status=404, body=json.dumps({'not found': 404}),
+                            content_type='application/json')
+        async with pool.acquire() as connection:
+            instance = models.update_record(connection, data)
+        return Response(status=201, body=json.dumps(instance),
+                        content_type='application/json')
 
-    def register(self, router: UrlDispatcher):
-        router.add_route('*', '/forecast', self.collection_endpoint.dispatch)
-        router.add_route('*', '/forecast/{instance_date}',
-                         self.instance_endpoint.dispatch)
+
+    async def delete_record(self, request) -> Response:
+        pool = request.app['pool']
+        instance_date = request.match_info.get('date', None)
+        if not instance_date:
+            return Response(status=400, body=json.dumps({'bad request': 400}),
+                            content_type='application/json')
+        async with pool.acquire() as connection:
+            instance = await models.get_record_by_date(connection, instance_date)
+            if not instance:
+                return Response(status=404, body=json.dumps({'not found': 404}),
+                            content_type='application/json')
+            await models.delete_record(connection, instance_date)
+        return Response(status=204, body=json.dumps({'success': 204}),
+                            content_type='application/json')
+
 
 
 if __name__ == '__main__':
-    #
-    #
-    # http://0.0.0.0:8080/forecast/ to get forecast ro last 30 days
-    # http://0.0.0.0:8080/forecast/YYYY-MM-DD to get forecast for specific day
-    #  in last month
-    #
-    #
 
-    models.load_database()
-    # print(len(models.get_all_records()))
+    loop = uvloop.new_event_loop()
+    asyncio.set_event_loop(loop)
     app = Application()
-    resource = RestResource()
-    resource.register(app.router)
+    handler = Handler()
+    app.add_routes([web.get('/forecast', handler.get_all_records),
+                    web.get('/forecast/{date}', handler.get_record),
+                    web.post('/forecast', handler.post_record),
+                    web.delete('/forecast/{date}', handler.delete_record),
+                    web.put('/forecast/{date}', handler.put_record)])
+    app.on_startup.append(init_db)
+    # app.on_startup.append(load_forecasts_to_db)
+    app.on_cleanup.append(close_db)
     run_app(app)
