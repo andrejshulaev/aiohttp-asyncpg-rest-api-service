@@ -16,6 +16,7 @@ from utils import load_forecasts_to_db
 class Handler:
 
     async def get_all_records(self, request) -> Response:
+        ''' Method to handle GET request on main address'''
         pool = request.app['pool']
         offset = request.rel_url.query.get('offset', 0)
         limit = request.rel_url.query.get('limit', 10)
@@ -27,6 +28,7 @@ class Handler:
 
 
     async def post_record(self, request) -> Response:
+        ''' Method to handle POST request on main address'''
         pool = request.app['pool']
         data = await request.json()
 
@@ -38,6 +40,7 @@ class Handler:
 
 
     async def get_record(self, request) -> Response:
+        ''' Method to handle GET request to get record with specific date'''
         pool = request.app['pool']
         today = datetime.datetime.today().strftime('%Y/%m/%d')
         instance_date = request.match_info.get('date', today)
@@ -51,6 +54,7 @@ class Handler:
 
 
     async def put_record(self, request) -> Response:
+        ''' Method to handle PUT request to change record with cpecific date'''
         pool = request.app['pool']
         data = await request.json()
         instance_date = request.match_info.get('date', None)
@@ -69,6 +73,7 @@ class Handler:
 
 
     async def delete_record(self, request) -> Response:
+        ''' Method to handle DELETE request to change record with cpecific date'''
         pool = request.app['pool']
         instance_date = request.match_info.get('date', None)
         if not instance_date:
@@ -97,6 +102,6 @@ if __name__ == '__main__':
                     web.delete('/forecast/{date}', handler.delete_record),
                     web.put('/forecast/{date}', handler.put_record)])
     app.on_startup.append(init_db)
-    # app.on_startup.append(load_forecasts_to_db)
+    app.on_startup.append(load_forecasts_to_db)
     app.on_cleanup.append(close_db)
     run_app(app)
