@@ -1,4 +1,3 @@
-import inspect
 import json
 import asyncio
 import uvloop
@@ -9,8 +8,8 @@ from aiohttp.web import Response, Application, run_app
 
 import models.models as models
 
-from models.db import init_db, close_db
-from utils import load_forecasts_to_db
+from models.dao import init_db, close_db
+from models.db_fill import load_forecasts_to_db
 
 
 class Handler:
@@ -31,12 +30,13 @@ class Handler:
         ''' Method to handle POST request on main address'''
         pool = request.app['pool']
         data = await request.json()
-
         async with pool.acquire() as connection:
             res = await models.insert_record(connection, data)
         if not res[0]:
-            return Response(status=400, body=json.dumps({{res[1]: 400}}), content_type='application/json')
-        return Response(status=200, body=json.dumps({{'success': 204}}), content_type='application/json')
+            return Response(status=409, body=json.dumps({{res[1]: 409}}),
+                            content_type='application/json')
+        return Response(status=200, body=json.dumps({{'success': 204}}),
+                        content_type='application/json')
 
 
     async def get_record(self, request) -> Response:
@@ -89,9 +89,7 @@ class Handler:
                             content_type='application/json')
 
 
-
 if __name__ == '__main__':
-
     loop = uvloop.new_event_loop()
     asyncio.set_event_loop(loop)
     app = Application()
