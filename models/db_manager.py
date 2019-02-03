@@ -2,7 +2,7 @@ import asyncpg
 
 from models.models import FORECAST_DB_CREATION
 
-async def init_db(app=None):
+async def init_db(app):
     '''Initialize pool object with connection to db and create new db'''
     pool = await asyncpg.create_pool(
         database='test_db',

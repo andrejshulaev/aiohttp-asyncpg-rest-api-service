@@ -1,12 +1,3 @@
-import collections
-import requests
-import datetime
-import aiohttp
-import asyncio
-
-import models as models
-
-
 def process_result_to_json(db_out):
     res = []
     for i in db_out:
@@ -28,4 +19,3 @@ def process_result_to_json(db_out):
         }
         res.append(json)
     return res
-

@@ -1,8 +1,8 @@
-from utils import process_result_to_json
+from models.utils import process_result_to_json
 
 
 FORECAST_DB_CREATION = '''DROP TABLE IF EXISTS forecast;
-    CREATE TABLE  forecast(
+    CREATE TABLE forecast(
     id SERIAL NOT NULL PRIMARY KEY,
     applicable_date VARCHAR NOT NULL,
     weather_state_name VARCHAR NOT NULL,
@@ -24,7 +24,7 @@ SQL_GET_ALL_RECORDS = '''SELECT applicable_date, weather_state_name,
     weather_state_abbr, wind_direction_compass, created, min_temp,
     max_temp, the_temp, wind_speed, wind_direction, air_pressure, humidity,
     visibility, predictability FROM forecast 
-    ORDER BY applicable_date ASC '''
+    ORDER BY applicable_date DESC '''
 
 SQL_GET_RECORD_BY_DATE = '''SELECT applicable_date, weather_state_name, 
     weather_state_abbr, wind_direction_compass, created, min_temp,
@@ -60,15 +60,26 @@ SQL_INSERT_RECORD = '''INSERT INTO forecast(applicable_date, weather_state_name,
 
 SQL_DELETE_RECORD = 'DELETE FROM forecast WHERE applicable_date = $1'
 
+SQL_GET_DATE_OF_LAST_RECORD = '''SELECT applicable_date FROM forecast
+ORDER BY applicable_date ASC 
+LIMIT 1'''
+
+
+
+async def get_last_record_date(conn):
+    """function to check last record date"""
+    async with conn.transaction():
+        res = await conn.fetch(SQL_GET_DATE_OF_LAST_RECORD)
+    return res
 
 async def get_all_records(conn, limit=None, offset=None):
-    '''Function to fetch all records from db with specified limit and offset'''
+    """Function to fetch all records from db with specified limit and offset"""
     limit_sql = 'LIMIT $1' if limit else ''
     offset_sql = ' OFFSET $2' if offset else ''
     sql = SQL_GET_ALL_RECORDS + limit_sql + offset_sql
     limit = int(limit) if limit else limit
     offset = int(offset) if offset else offset
-    args = (arg for arg in (sql, limit, offset) if arg is not None)
+    args = [arg for arg in (sql, limit, offset) if arg is not None]
     async with conn.transaction():
         res = await conn.fetch(*args)
     if len(res) == 0:
@@ -77,16 +88,14 @@ async def get_all_records(conn, limit=None, offset=None):
 
 
 async def get_record_by_date(conn, date):
-    '''Function to get record to specific date'''
+    """Function to get record to specific date"""
     async with conn.transaction():
         res = await conn.fetch(SQL_GET_RECORD_BY_DATE, date)
-    if len(res) == 0:
-        pass
     return process_result_to_json(res)
 
 
 async def update_record(conn, forecast):
-    '''Function to update existing record'''
+    """Function to update existing record"""
     async with conn.transaction():
         date = forecast['applicable_date'],
         res = await conn.fetch(
@@ -112,7 +121,7 @@ async def update_record(conn, forecast):
 
 
 async def delete_record(conn, date):
-    '''Delete existing record from db'''
+    """Delete existing record from db"""
     async with conn.transaction():
         res = await conn.fetch(SQL_DELETE_RECORD, date)
     if len(res) == 0:
