@@ -6,7 +6,7 @@ import datetime
 from aiohttp import web
 from aiohttp.web import Response, Application, run_app
 
-import models.models as models
+import models.dao as models
 from models.db_manager import init_db, close_db
 from models.db_fill import load_forecasts_to_db
 
@@ -43,7 +43,7 @@ class Handler:
         if not instance:
             return Response(status=404, body=json.dumps({'not found': 404}),
                             content_type='application/json')
-        return Response(status=200, body=json.dumps(instance),
+        return Response(status=200, body=json.dumps({'records': instance}),
                         content_type='application/json')
 
     async def put_record(self, request) -> Response:
@@ -79,7 +79,7 @@ class Handler:
                         content_type='application/json')
 
 
-if __name__ == '__main__':
+def main():
     loop = uvloop.new_event_loop()
     asyncio.set_event_loop(loop)
     app = Application()
@@ -93,3 +93,7 @@ if __name__ == '__main__':
     app.on_startup.append(load_forecasts_to_db)
     app.on_cleanup.append(close_db)
     run_app(app)
+
+
+if __name__ == '__main__':
+    main()

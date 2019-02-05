@@ -1,6 +1,6 @@
 import asyncpg
 
-from models.models import FORECAST_DB_CREATION
+from models.dao import FORECAST_DB_CREATION
 
 async def init_db(app):
     '''Initialize pool object with connection to db and create new db'''

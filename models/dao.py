@@ -1,10 +1,10 @@
 from models.utils import process_result_to_json
 
 
-FORECAST_DB_CREATION = '''DROP TABLE IF EXISTS forecast;
-    CREATE TABLE forecast(
-    id SERIAL NOT NULL PRIMARY KEY,
-    applicable_date VARCHAR NOT NULL,
+FORECAST_DB_CREATION = '''--DROP TABLE IF EXISTS forecast;
+    CREATE TABLE IF NOT EXISTS forecast(
+    id SERIAL NOT NULL,
+    applicable_date DATE NOT NULL PRIMARY KEY, --date to_date() -> to_char() postgres func
     weather_state_name VARCHAR NOT NULL,
     weather_state_abbr VARCHAR NOT NULL,
     wind_direction_compass VARCHAR NOT NULL,
@@ -20,22 +20,25 @@ FORECAST_DB_CREATION = '''DROP TABLE IF EXISTS forecast;
     predictability INTEGER NOT NULL);'''
 
 
-SQL_GET_ALL_RECORDS = '''SELECT applicable_date, weather_state_name, 
+SQL_GET_ALL_RECORDS = '''SELECT 
+    TO_CHAR(applicable_date, 'YYYY-MM-DD') as applicable_date, weather_state_name, 
     weather_state_abbr, wind_direction_compass, created, min_temp,
     max_temp, the_temp, wind_speed, wind_direction, air_pressure, humidity,
     visibility, predictability FROM forecast 
     ORDER BY applicable_date DESC '''
 
-SQL_GET_RECORD_BY_DATE = '''SELECT applicable_date, weather_state_name, 
-    weather_state_abbr, wind_direction_compass, created, min_temp,
-    max_temp, the_temp, wind_speed, wind_direction, air_pressure, humidity,
-    visibility, predictability 
+
+SQL_GET_RECORD_BY_DATE = '''SELECT 
+    TO_CHAR(applicable_date, 'YYYY-MM-DD') as applicable_date, 
+    weather_state_name,  weather_state_abbr, wind_direction_compass, created, 
+    min_temp, max_temp, the_temp, wind_speed, wind_direction, air_pressure, 
+    humidity, visibility, predictability 
     FROM forecast 
-    WHERE applicable_date = $1;
+    WHERE applicable_date = TO_DATE($1, 'YYYY-MM-DD');
     '''
 
-SQL_UPDATE_RECORD    = '''UPDATE forecast
-    SET applicable_date = $2,
+SQL_UPDATE_RECORD = '''UPDATE forecast
+    SET applicable_date = TO_DATE($2, 'YYYY-MM-DD'),
     weather_state_name = $3,
     weather_state_abbr = $4,
     wind_direction_compass = $5,
@@ -49,20 +52,23 @@ SQL_UPDATE_RECORD    = '''UPDATE forecast
     humidity = $13,
     visibility = $14,
     predictability = $15
-    WHERE forecast.applicable_date = $1;
+    WHERE forecast.applicable_date = TO_DATE($2, 'YYYY-MM-DD');
     '''
 
 SQL_INSERT_RECORD = '''INSERT INTO forecast(applicable_date, weather_state_name, 
     weather_state_abbr, wind_direction_compass, created, min_temp,
     max_temp, the_temp, wind_speed, wind_direction, air_pressure, humidity,
-    visibility, predictability
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);'''
+    visibility, predictability) 
+    VALUES (TO_DATE($1, 'YYYY-MM-DD'), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);'''
 
-SQL_DELETE_RECORD = 'DELETE FROM forecast WHERE applicable_date = $1'
+SQL_DELETE_RECORD = "DELETE FROM forecast WHERE applicable_date = TO_DATE($1, 'YYYY-MM-DD')"
 
-SQL_GET_DATE_OF_LAST_RECORD = '''SELECT applicable_date FROM forecast
-ORDER BY applicable_date ASC 
-LIMIT 1'''
+SQL_GET_DATE_OF_LAST_RECORD = '''SELECT 
+    TO_CHAR(applicable_date, 'YYYY-MM-DD') as applicable_date FROM forecast
+    ORDER BY applicable_date ASC 
+    LIMIT 1'''
+
+SQL_DROP_TABLE = 'DROP TABLE forecast'
 
 
 
@@ -85,6 +91,15 @@ async def get_all_records(conn, limit=None, offset=None):
     if len(res) == 0:
         pass
     return process_result_to_json(res)
+
+
+async def check_record_presence(app, date):
+    """Function to get record to specific date"""
+    async with app['pool'].acquire() as conn:
+        async with conn.transaction():
+            res = await conn.fetch(SQL_GET_RECORD_BY_DATE, date)
+    return None if res else date
+
 
 
 async def get_record_by_date(conn, date):
