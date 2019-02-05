@@ -75,9 +75,8 @@ class Handler:
                 return Response(status=404, body=json.dumps({'not found': 404}),
                                 content_type='application/json')
             await models.delete_record(connection, instance_date)
-        return Response(status=204, body=json.dumps({'success': 204}),
+        return Response(status=204, body=json.dumps({'Success': 204}),
                         content_type='application/json')
-
 
 def main():
     loop = uvloop.new_event_loop()

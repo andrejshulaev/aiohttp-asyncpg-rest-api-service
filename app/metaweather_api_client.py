@@ -1,4 +1,3 @@
-import asyncio
 import requests
 
 URL_TO_GET_WOEID = 'https://www.metaweather.com/api/location/search/?query='

@@ -1,17 +1,19 @@
-#### API usage
+### Meta weather API 
+
+Prerequisites:
+  `Docker`
 
 
-Before run:
 ```
-docker-compose -f docker-compose.yml up -d
-virtualenv meta
-source meta/bin/activate
-cd meta && sudo pip install -r requirements.txt
+-> make
+- help:           Show available options with this Makefile
+- clean:          Clean the docker-container, venv etc.
+- install_dep:    Install the application and setup venv. Use once
+- run:            Run the application
 ```
-To run:
-```
-python -m app
-```
+
+---
+### Usage:
 
 To get records for last 10 days.
 
@@ -71,5 +73,4 @@ curl --request PUT \
             "visibility": 4.682963990296667,
             "predictability": 80}'\
     http://0.0.0.0:8080/forecast/2019-02-05
-
 ````
