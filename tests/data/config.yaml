@@ -1,0 +1,14 @@
+postgres:
+  user: "test"
+  password: "test"
+  database: "test_db"
+  host: localhost
+  port: 5432
+  poolsize_min: 1
+  poolsize_max: 5
+urls:
+  meta_url: "https://www.metaweather.com/api/location/"
+  meta_woeid_url: "https://www.metaweather.com/api/location/search/?query="
+date_const:
+  str_date_meta: "%Y/%m/%d"
+  str_date_db: "%Y-%m-%d"

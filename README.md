@@ -6,16 +6,19 @@ Prerequisites:
 
 ```
 -> make
-- help:           Show available options with this Makefile
-- clean:          Clean the docker-container, venv etc.
-- install_dep:    Install the application and setup venv. Use once
-- run:            Run the application
+help:            Show available options with this Makefile.    
+clean_all:       Clean the docker-container, venv etc.      
+clean_venv:      Clean the venv.                            
+test:            Run all the tests with pylint.                                  
+install_dep:     Setup venv and install the application.                                
+run:             Run the application with simple aiohttp server.           
+dev_run:         Run application in a dev mode, where gunicorn workers will reload the application on every change.  
 ```
 
 ---
 ### Usage:
 
-To get records for last 10 days.
+To get records. Default limit is 10
 
 POST here to add new one.
 
