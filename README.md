@@ -1,5 +1,8 @@
 ### Meta weather API 
 
+Python app that get the weather data from https://www.metaweather.com/ for Saint-Petersburg for last month and present the results with restful api. 
+
+
 Prerequisites:
   `Docker`
 
